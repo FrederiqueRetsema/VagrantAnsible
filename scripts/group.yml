@@ -1,0 +1,8 @@
+---
+- hosts: linuxSlave
+  become: yes
+  tasks:
+    - name: Create group sudoers
+      group:
+         name: sudoers
+         state: present

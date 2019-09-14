@@ -1,0 +1,17 @@
+---
+- hosts: linuxSlave
+  tasks:
+    - name: Copy script to other node
+      copy:
+        src: /home/ansible/script.sh
+        dest: /home/ansible/script.sh
+        owner: ansible
+        group: ansible
+        mode: 0744
+    - name: Execute script remote
+      shell: /home/ansible/script.sh > /home/ansible/output.txt
+    - name: Get the result back
+      fetch:
+        dest: /home/ansible/results/
+        fail_on_missing: no
+        src: /home/ansible/output.txt

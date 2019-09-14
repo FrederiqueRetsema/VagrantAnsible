@@ -1,0 +1,9 @@
+---
+- hosts: linuxSlave
+  tasks:
+    - name: Add time to history command
+      lineinfile:
+        path: /home/ansible/.bash_profile
+        state: present
+        line: "export HISTTIMEFORMAT='%d/%m/%y %T '"
+

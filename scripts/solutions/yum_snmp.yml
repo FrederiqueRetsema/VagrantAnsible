@@ -1,0 +1,9 @@
+---
+- hosts: linuxSlave
+  become: yes
+  tasks:
+    - name: yum install snmp
+      yum:
+        name: net-snmp
+        state: present
+ 

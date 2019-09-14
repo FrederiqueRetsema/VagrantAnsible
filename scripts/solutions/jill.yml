@@ -1,0 +1,10 @@
+---
+- hosts: linuxSlave
+  become: yes
+  tasks:
+    - name: Add Jill
+      user:
+         name: jill
+         state: present
+         append: yes
+         groups: sudoers

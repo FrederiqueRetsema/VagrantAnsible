@@ -1,0 +1,15 @@
+---
+- hosts: linuxSlave
+  become: yes
+  tasks:
+    - name: "Create group sudoers"
+      group:
+         name: sudoers
+         state: present
+    - name: "Add line to the sudoers file, all commands allowed"
+      lineinfile:
+        path: /home/ansible/extra_sudoers_line.txt
+        state: present
+        create: yes
+        line: "%sudoers\tALL=(ALL)\tALL"
+

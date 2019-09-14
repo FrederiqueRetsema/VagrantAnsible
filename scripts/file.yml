@@ -1,0 +1,8 @@
+---
+- hosts: linuxSlave
+  tasks:
+    - name: touch file in homedir
+      file: 
+        name: ~/file_in_homedir
+        state: touch
+

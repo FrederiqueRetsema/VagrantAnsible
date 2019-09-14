@@ -1,0 +1,19 @@
+---
+- hosts: linuxSlave
+  become: yes
+  tasks:
+    - name: "Create group sudoers"
+      group:
+         name: sudoers
+         state: present
+    - name: "Add line to the sudoers file, all commands allowed"
+      lineinfile:
+        path: /etc/sudoers
+        state: present
+        line: "%sudoers\tALL=(ALL)\tALL"
+    - name: "Disable the root user"
+      user:
+        name: root
+        state: present
+        password_lock: yes
+

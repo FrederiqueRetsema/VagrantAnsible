@@ -1,0 +1,9 @@
+---
+- hosts: linuxSlave
+  tasks:
+    - name: Add alias to .bash_profile 
+      lineinfile:
+         path: /home/ansible/.bash_profile
+         state: present
+         line: "alias ch='cat /etc/hosts'"
+
