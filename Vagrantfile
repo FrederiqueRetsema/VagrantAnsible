@@ -39,12 +39,12 @@ Vagrant.configure("2") do |config|
     # Name of this VM
     windowsSlave.vm.box = "jacqinthebox/windowsserver2016"
 
-    windowsSlave.vm.hostname = "dc"
+    windowsSlave.vm.hostname = "iis"
     windowsSlave.vm.provider "virtualbox" do |vb|
       # Name of this VM
       vb.name = "Windows Slave node (Windows Server 2016)"
-      vb.customize ["modifyvm", :id, "--memory", "2048"]
-      vb.customize ["modifyvm", :id, "--cpus", "2"]   
+      vb.customize ["modifyvm", :id, "--memory", "8192"]
+      vb.customize ["modifyvm", :id, "--cpus", "4"]   
     end
     windowsSlave.vm.network "private_network", type: "dhcp"
   end

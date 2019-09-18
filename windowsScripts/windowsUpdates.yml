@@ -1,0 +1,14 @@
+---
+- hosts: windows
+  tasks:
+    - name: Windows Updates
+      win_updates:
+        state: installed
+      register: update_result
+
+    - name: reboot if necessary
+      win_reboot:
+      when: update_result.reboot_required
+
+
+  

@@ -25,7 +25,9 @@ Table of contents:
 2.2.6 Excercise: yum update  
 2.2.7 Excercise: use yum to install snmp  
 2.2.8 Excercise: Sending and executing a script on other nodes  
-3. Useful links
+3. Windows
+3.1 Installation
+4. Useful links
 
 # 1. Installation and configuration 
 ## 1.1 Installation of Vagrant and VirtualBox
@@ -84,7 +86,7 @@ Use the following command on the control node:
 
 You don't need to install ansible on the linux slave node: ansible uses ssh to connect to other linux machines.
 
-By default, the CentOS7 machines that we use, don't allow ssh connections with passwords. So let's change that on the linuxSlave-side to make it easier to send the key from the control node. Log on to both the linuxSlave and control and type:  
+By default, the CentOS7 machines that we use, don't allow ssh connections with passwords. So let's change that to make it easier to send the key from the control node. Log on to `both` the linuxSlave and control and type:  
 `sudo -i`  
 `vi /etc/ssh/sshd_config` (change the line "`PasswordAuthentication no`" to "`PasswordAuthentication yes`"). After that, reboot the service:  
 `systemctl restart sshd`
@@ -92,7 +94,7 @@ By default, the CentOS7 machines that we use, don't allow ssh connections with p
 Let's create a user on both the control and linuxSlave nodes and make it possible for the control node to log on to the slave node. Login to the slave node and type:
 
 `sudo -i`  
-`useradd -m -aG wheel ansible`  
+`useradd -m -G wheel ansible`  
 `passwd ansible` (create a password that you can remember)  
 
 Log on to the slave node, and look at it's IP address:   
@@ -107,24 +109,19 @@ On the control node, add this address in the /etc/hosts table:
 - add (for example) `172.28.128.4 linuxSlave` 
 - add `127.0.0.1 control`
 
-Do the same for Windows: start in Windows a cmd prompt, type  
-`ifconfig`  
-and add the ip address to /etc/hosts on the control node, for example:  
-- add `172.28.128.5 windowsSlave`
-
 Logon to the control node and type:
 
 `sudo -i`  
-`useradd -m -aG wheel ansible`  
+`useradd -m -G wheel ansible`  
 `passwd ansible` (create a password that you can remember)  
 
 On the control node, continue with creating a key for the ansible node:
 
 `su ansible`   
-`cd`
+`cd`  
 `ssh-keygen` (defaults are fine)
 
-Now copy the key to both the linuxSlave and control (to make it possible to change the control node itself using ansible):  
+Now copy the key to both the linuxSlave and control (to make it possible to change the control node itself using ansible). On the control node:  
 `su ansible`  
 `ssh-copy-id ansible@linuxSlave` (type yes to add the key of the linuxSlave to the known hosts, type the password of ansible on linuxSlave after that)  
 `ssh-copy-id ansible@control` (type yes to add the key of control to the known hosts, type the password of ansible on control after that)
@@ -147,9 +144,6 @@ Add the following lines:
 `[linux]`  
 `control`  
 `linuxSlave`  
-  
-`[windows]`  
-`windowsSlave`
 
 If you want to, change the line `PasswordAuthentication` back to `no` in the file /etc/ssh/sshd_config on the linuxSlave and control machines.
 
@@ -160,6 +154,7 @@ Windows will not work (yet), we will first start with Ansible on Linux.
 ## 2.1 Using Ansible ad-hoc commands on Linux
 The first test is to see if Ansible is installed and configured correctly:  
 
+`su ansible`  
 `ansible linux -m ping`  
 
 This will send a simple ping (via ssh, not via ICMP) to all the nodes that are part of the linux group. You will get the following result:  
@@ -432,7 +427,140 @@ Check (on the control node) that this script works as expected. Create a playboo
 - The solution is in the solution folder (filename script.yml)
 - In production environment, you will want to get a remote file back. Look at the fetch module for that. (script_and_fetch.yml) for an implementation.
 
-# 3 Useful links
+# 3 Windows
+
+## 3.1 Installation
+When you want to use Ansible on Windows, there are many options to setup your environment. Setup will also differ between various versions of Windows, see this link for more detail: https://docs.ansible.com/ansible/latest/user_guide/windows.html . 
+
+In this section, we will install Ansible on Windows 2016, in a very fast (but insecure) way. The reason for this is that we are playing along in a development environment, in a temporary situation. The focus in our excercises is the ansible playbooks for Windows, not on the installation. 
+
+Log on to the Windows 2016 node with the Vagrant user, and start a Powershell window. Use the following code to configure remoting for Ansible:
+
+    $url = "https://raw.githubusercontent.com/ansible/ansible/devel/examples/scripts/ConfigureRemotingForAnsible.ps1"
+    $file = "$env:temp\ConfigureRemotingForAnsible.ps1"
+
+    (New-Object -TypeName System.Net.WebClient).DownloadFile($url, $file)
+
+    powershell.exe -ExecutionPolicy ByPass -File $file
+
+After that, use the following command to setup the WinRM listener:
+
+`winrm quickconfig`
+
+We will use basic authentication without encryption, so run the following in Powershell:
+
+`Set-Item -Path WSMan:\localhost\Service\Auth\Basic -Value $true`
+`Set-Item -Path WSMan:\localhost\Service\AllowUnencrypted -Value $true`
+
+Now, we need the IP-Address of the Windows node: type
+
+`ipconfig`  
+
+add the ip address to /etc/hosts on the control node, for example:  
+- add `172.28.128.5 windowsSlave`
+
+Now, we will configure the settings for the Windows-node in the /etc/ansible/hosts file. Add the following lines:
+
+`[windows]`  
+`windowsSlave`
+
+`[windows:vars]`  
+`ansible_user=vagrant`  
+`ansible_password=vagrant`  
+`ansible_connection=winrm`  
+`ansible_winrm_transport=basic`
+`ansible_port=5985`
+
+On the control node, we need to install extra software to allow Ansible to use winrm:
+
+`yum install python2-pip`  
+`pip install "pywinrm>=0.3.0"`
+
+Now all is installed, we can do a simple ping, mind that the module has another name on Windows than on Linux:
+
+`ansible windows -m win_ping`
+
+## 3.1 Windows Updates
+Let's look at the playbook for Windows Update (source: https://docs.ansible.com/ansible/latest/user_guide/windows_usage.html ):
+
+    ---
+    - hosts: windows
+      tasks:
+        - name: Windows Updates
+          win_updates:
+            state: installed
+          register: update_result
+
+        - name: reboot if necessary
+          win_reboot:
+          when: update_result.reboot_required
+
+You see that we use two modules: win_updates, to check for (and install) the updates, and win_reboot to reboot the machine if necessary. The result of win_updates is passed to win_reboot via the register keyword and an intermediate variable update_result. 
+
+You can use register to get the results for any module, and show the contents of this variable via the debug module:
+
+    ---
+    - hosts: windows
+      tasks:
+        - name: Windows Updates
+          win_updates:
+            state: installed
+          register: update_result
+
+        - name: show contents of update_result
+          debug:
+            var: update_result
+
+        - name: reboot if necessary
+          win_reboot:
+          when: update_result.reboot_required
+
+These playbooks can be found in the c:\vagrant\windowsScripts directory. 
+- Run both playbooks. Mind, that WindowsUpdates can take a considerable amount of time.
+- When you ran the second playbook, the Windows VM shouldn't be rebooted, due to the when-keyword.
+
+# 3.2 Using Ansible to install software
+Let's create a server. We need an IIS server, with specific features. We also make absolutely sure that, whatever happens, one specific feature will NOT be enabled. In Powershell, we would use Install-WindowsFeature, but in Ansable we have a module for that: win_feature.
+
+You can use the Powershell-command Get-WindowsFeature to get the names of the features:
+
+    ---
+    - hosts: windows
+      become: yes
+      tasks:
+      - name: Install IIS on this node
+        win_feature:
+          include_management_tools: yes
+          name:
+          - Web-Default-Doc
+          - Web-Dir-Browsing
+          - Web-Http-Errors
+          - Web-Static-Content
+          - Web-Http-Logging
+          - Web-Stat-Compression
+          - Web-Dyn-Compression
+          - Web-Filtering
+          - Web-Windows-Auth
+          - Web-Net-Ext45
+          - Web-Asp-Net45
+          - Web-ISAPI-Ext
+          - Web-ISAPI-Filter
+          - Web-WebSockets
+          - Web-Mgmt-Console
+          state: present
+      - name: Be sure that WebDAV is disabled
+        win-feature:
+          name: Web-DAV-Publishing
+          state: absent
+
+
+
+
+
+
+
+
+# 4 Useful links
 - List with all modules: https://docs.ansible.com/ansible/latest/modules/list_of_all_modules.html
 - Modules per category:  https://docs.ansible.com/ansible/latest/modules/modules_by_category.html
 
