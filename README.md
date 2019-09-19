@@ -36,6 +36,7 @@ First, we have to install Vagrant and VirtualBox: use a laptop where you have fu
 Install VirtualBox and Vagrant:
 - VirtualBox: https://www.virtualbox.org/wiki/Downloads
 - Vagrant: https://www.vagrantup.com/
+- VirtualBox Guest Editions: https://download.virtualbox.org/virtualbox/6.0.12/VBoxGuestAdditions_6.0.12.iso
 
 ## 1.2 Installation of the VM's
 Clone this repository:
@@ -131,7 +132,7 @@ Try to log on to the slave node, you shouldn't be asked for a password:
 `exit` (to go back to control)
 
 Try to log on with ssh to the control node, you shouldn't be asked for a password:  
-`ssh ansible@localhost`  
+`ssh ansible@control`  
 `exit` (to come back)
 
 `exit` (to go back to the root user on the control node)
@@ -304,8 +305,8 @@ First of all, let's create the group (group.yml):
 
 Did you notice the line under hosts? The `become: yes` line will elevate our account to root. Execute this playbook and check if the group has been created on the linuxSlave-node:
 
-`ansible-playbook group.yml -K`
-`ssh ansible@linuxSlave`
+`ansible-playbook group.yml -K`  
+`ssh ansible@linuxSlave`  
 `cat /etc/group`
 
 You need the -K parameter on the commandline to ask for the ansible password on the remote node to become a priviledged user.
@@ -430,11 +431,15 @@ Check (on the control node) that this script works as expected. Create a playboo
 # 3 Windows
 
 ## 3.1 Installation
+In Vagrant, there are some problems with the downloaded Windows 2016 box in combination with the c:\vagrant drive. This is caused by a different version of the Virtual Box Guest Editions. Insert the iso via the window of the windowsSlave-machine (Machine > Settings > Storage). Click on the empty Cd-Rom under IDE Controller, and click on the blue disk right of Optical Drive. Now choose "Virtual Optical Disk File" and insert the iso that you downloaded in part 1 of this description. 
+
+Log on on the windows Slave-node, install the VirtualBox Guest Editions (all default options are fine). When you installed the VirtualBox Guest Editions (and rebooted the Windows VM), you will be able to go to c:\vagrant and see the contents.
+
 When you want to use Ansible on Windows, there are many options to setup your environment. Setup will also differ between various versions of Windows, see this link for more detail: https://docs.ansible.com/ansible/latest/user_guide/windows.html . 
 
 In this section, we will install Ansible on Windows 2016, in a very fast (but insecure) way. The reason for this is that we are playing along in a development environment, in a temporary situation. The focus in our excercises is the ansible playbooks for Windows, not on the installation. 
 
-Log on to the Windows 2016 node with the Vagrant user, and start a Powershell window. Use the following code to configure remoting for Ansible:
+Log on to the Windows 2016 node with the Vagrant user, and start a Powershell window. Use the following code to configure remoting for Ansible (c:\vagrant\windowsScripts\installation_configure_remoting_for_ansible.ps1):
 
     $url = "https://raw.githubusercontent.com/ansible/ansible/devel/examples/scripts/ConfigureRemotingForAnsible.ps1"
     $file = "$env:temp\ConfigureRemotingForAnsible.ps1"
@@ -468,7 +473,7 @@ Now, we will configure the settings for the Windows-node in the /etc/ansible/hos
 `ansible_user=vagrant`  
 `ansible_password=vagrant`  
 `ansible_connection=winrm`  
-`ansible_winrm_transport=basic`
+`ansible_winrm_transport=basic`  
 `ansible_port=5985`
 
 On the control node, we need to install extra software to allow Ansible to use winrm:
