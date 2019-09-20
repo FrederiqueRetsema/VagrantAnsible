@@ -1,0 +1,33 @@
+---
+- hosts: windows
+  tasks:
+  - name: Install IIS on this node
+    win_feature:
+      name:
+      - Web-Default-Doc
+      - Web-Dir-Browsing
+      - Web-Http-Errors
+      - Web-Static-Content
+      - Web-Http-Logging
+      - Web-Stat-Compression
+      - Web-Dyn-Compression
+      - Web-Filtering
+      - Web-Windows-Auth
+      - Web-Net-Ext45
+      - Web-Asp-Net45
+      - Web-ISAPI-Ext
+      - Web-ISAPI-Filter
+      - Web-WebSockets
+      - Web-Mgmt-Console
+      state: present
+      include_management_tools: yes
+
+  - name: Be sure that WebDAV is disabled
+    win_feature:
+      name: Web-DAV-Publishing
+      state: absent
+
+  - name: Configure delegation (IIS > Management > Feature Delegation)
+    win_shell: |
+      Set-WebConfiguration //System.WebServer/Security/Authentication/anonymousAuthentication -metadata overrideMode -value Allow -PSPath IIS:/
+      Set-WebConfiguration //System.WebServer/Security/Authentication/windowsAuthentication -metadata overrideMode -value Allow -PSPath IIS:/

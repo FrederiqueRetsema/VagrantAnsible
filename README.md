@@ -454,7 +454,7 @@ After that, use the following command to setup the WinRM listener:
 
 We will use basic authentication without encryption, so run the following in Powershell:
 
-`Set-Item -Path WSMan:\localhost\Service\Auth\Basic -Value $true`
+`Set-Item -Path WSMan:\localhost\Service\Auth\Basic -Value $true`  
 `Set-Item -Path WSMan:\localhost\Service\AllowUnencrypted -Value $true`
 
 Now, we need the IP-Address of the Windows node: type
@@ -520,6 +520,90 @@ You can use register to get the results for any module, and show the contents of
           win_reboot:
           when: update_result.reboot_required
 
+When you run this playbook, you may see the following output:
+
+
+    [vagrant@control windowsScripts]$ ansible-playbook windowsUpdatesDebug.yml
+
+    PLAY [windows] *********************************************************************************************************
+
+    TASK [Gathering Facts] *************************************************************************************************
+    ok: [windowsSlave]
+
+    TASK [Windows Updates] *************************************************************************************************
+    changed: [windowsSlave]
+
+    TASK [show contents of update statement] *******************************************************************************
+    ok: [windowsSlave] => {
+        "update_result": {
+            "changed": true,
+            "failed": false,
+            "failed_update_count": 0,
+            "filtered_updates": {
+                "1631a9c2-c045-4def-b6e7-dc206013dc97": {
+                    "categories": [
+                        "Definition Updates",
+                        "Windows Defender"
+                    ],
+                    "filtered_reason": "category_names",
+                    "id": "1631a9c2-c045-4def-b6e7-dc206013dc97",
+                    "installed": false,
+                    "kb": [
+                        "2267602"
+                    ],
+                    "title": "Security Intelligence Update for Windows Defender Antivirus - KB2267602 (Version 1.301.1787.0)"
+                },
+                "a711f6a5-5bf3-4392-95d0-686f748789dd": {
+                    "categories": [
+                        "Updates",
+                        "Windows Server 2016"
+                    ],
+                    "filtered_reason": "category_names",
+                    "id": "a711f6a5-5bf3-4392-95d0-686f748789dd",
+                    "installed": false,
+                    "kb": [
+                        "4103720"
+                    ],
+                    "title": "2018-05 Cumulative Update for Windows Server 2016 for x64-based Systems (KB4103720)"
+                }
+            },
+            "found_update_count": 2,
+            "installed_update_count": 2,
+            "reboot_required": false,
+            "updates": {
+                "d0bf3ffb-d01a-4877-b5df-be5d48ff898c": {
+                    "categories": [
+                        "Update Rollups",
+                        "Windows Server 2016"
+                    ],
+                    "id": "d0bf3ffb-d01a-4877-b5df-be5d48ff898c",
+                    "installed": true,
+                    "kb": [
+                        "890830"
+                    ],
+                    "title": "Windows Malicious Software Removal Tool x64 - August 2019 (KB890830)"
+                },
+                "df51b003-58d6-42d6-ad9e-d81adaa1437e": {
+                    "categories": [
+                        "Security Updates",
+                        "Windows Server 2016"
+                    ],
+                    "id": "df51b003-58d6-42d6-ad9e-d81adaa1437e",
+                    "installed": true,
+                    "kb": [
+                        "4512574"
+                    ],
+                    "title": "2019-09 Servicing Stack Update for Windows Server 2016 for x64-based Systems (KB4512574)"
+                }
+            }
+        }
+    }
+    TASK [reboot if necessary] *********************************************************************************************
+    skipping: [windowsSlave]
+
+    PLAY RECAP *************************************************************************************************************
+    windowsSlave               : ok=3    changed=1    unreachable=0    failed=0    skipped=1    rescued=0    ignored=0
+
 These playbooks can be found in the c:\vagrant\windowsScripts directory. 
 - Run both playbooks. Mind, that WindowsUpdates can take a considerable amount of time.
 - When you ran the second playbook, the Windows VM shouldn't be rebooted, due to the when-keyword.
@@ -558,16 +642,60 @@ You can use the Powershell-command Get-WindowsFeature to get the names of the fe
           name: Web-DAV-Publishing
           state: absent
 
+Let's change some configuration settings. First, we will allow feature delegation for anonymous, forms and windows authentication. You can find this in the IIS-tool in the properties of the IIS-server, under management, delegation, but we will do is script-wise. 
 
+The first place to search for a solution is the Windows module: https://docs.ansible.com/ansible/latest/modules/list_of_windows_modules.html . There are four iis modules, but these modules cannot be used to delegate features, so we have to use Powershell. I found the solution on the site of stackoverflow: https://stackoverflow.com/questions/35141373/toggle-iis-feature-delegation-with-powershell . When you give the value Allow, the value in the GUI is read/write. When the value is Deny, the value in the GUI is Read only. Mind, that the values Allow and Deny are case sensitive. For some strange reason, it doesn't seem to be possible to change the delegation of Forms authentication via Powershell. For our case this doesn't hurt, as we want to have the default of "Read/Write".
 
+`Set-WebConfiguration //System.WebServer/Security/Authentication/anonymousAuthentication -metadata overrideMode -value Allow -PSPath IIS:/`
 
+`Set-WebConfiguration //System.WebServer/Security/Authentication/windowsAuthentication -metadata overrideMode -value Allow -PSPath IIS:/`
 
+Now, let's assume that we want to change the authentication of our site. The way it looks in the GUI is quite simple: we have four settings that we can either enable or disable:
 
+- Anonymous Authentication
+- ASP.NET impersonation
+- Forms Authentication
+- Windows Authentication
 
+After some searching on the internet, I came to the following Powershell statements to change the Default Web Site: 
+
+`Set-WebConfigurationProperty -filter /system.WebServer/security/authentication/AnonymousAuthentication -name enabled -value true -location "Default Web Site"`  
+`Set-WebConfigurationProperty -filter /system.WebServer/security/authentication/WindowsAuthentication -name enabled -value false -location "Default Web Site"`  
+`Set-WebConfigurationProperty -filter /system.web/identity -name impersonate -value false -PSPATH "IIS:\Sites\Default Web Site"`  
+
+`# Stackoverflow: disable Forms https://stackoverflow.com/questions/37186386/powershell-script-that-switch-between-foms-authentication-and-windows-authentica`
+
+`#$config=(Get-Webconfiguration system.web/authentication "IIS:\sites\Default Web Site")`  
+`#$config.mode="Windows"`  
+`#$config | Set-WebConfiguration system.web/authentication`  
+
+`# Stackoverflow: enable Forms https://stackoverflow.com/questions/37186386/powershell-script-that-switch-between-foms-authentication-and-windows-authentica`
+
+`$config=(Get-Webconfiguration system.web/authentication "IIS:\sites\Default Web Site")`  
+`$config.mode="Forms"`  
+`$config | Set-WebConfiguration system.web/authentication`  
+
+Let's add this configuration to the previous Ansible script. Or even better: let me show how the first part (IIS > Management > Feature Delegation) works, and then you can try to do the same with the second part (IIS > Sites > Default Web Site). This first part is in c:\vagrant\windowsScripts (filename: iis_install_and_configure_1.yml):
+
+      [...]   
+      - name: Configure delegation
+        win_shell:
+          Set-WebConfiguration //System.WebServer/Security/Authentication/anonymousAuthentication -metadata overrideMode -value Allow -PSPath IIS:/
+          Set-WebConfiguration //System.WebServer/Security/Authentication/windowsAuthentication -metadata overrideMode -value Allow -PSPath IIS:/
+
+        - name: Configure delegation (IIS > Management > Feature Delegation)
+          win_shell: |
+            Set-WebConfiguration //System.WebServer/Security/Authentication/anonymousAuthentication -metadata overrideMode -value Allow -PSPath IIS:/
+            Set-WebConfiguration //System.WebServer/Security/Authentication/windowsAuthentication -metadata overrideMode -value Allow -PSPath IIS:/
+
+- You will see that the Default Web Site doesn't work when you don't change something to the code. Why would this be?
+- Look at the parameters of the Powershell-command, how could we solve this?
+- The answer is in the solution directory
 
 # 4 Useful links
 - List with all modules: https://docs.ansible.com/ansible/latest/modules/list_of_all_modules.html
 - Modules per category:  https://docs.ansible.com/ansible/latest/modules/modules_by_category.html
+- List with all Windows modules: https://docs.ansible.com/ansible/latest/modules/list_of_windows_modules.html 
 
 
 
